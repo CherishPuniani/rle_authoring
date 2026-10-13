@@ -5,7 +5,23 @@ import subprocess
 import sys
 from uuid import uuid4
 
-from ticket_report import summarize, build_bundle
+import runpy
+
+APPLICATION_SCRIPT = Path(__file__).resolve().with_name("ticket_report.py")
+
+
+def summarize(events):
+    application = runpy.run_path(str(APPLICATION_SCRIPT))
+    return application["summarize"](events)
+
+
+def build_bundle(input_path, output_path, debug=False):
+    application = runpy.run_path(str(APPLICATION_SCRIPT))
+    return application["build_bundle"](
+        input_path,
+        output_path,
+        debug=debug,
+    )
 
 
 def test_higher_revision_wins():
@@ -104,7 +120,7 @@ def test_build_bundle_preserves_report_and_debug_metadata():
         assert debug == {"events_processed": 2}
 
 def test_private_notes_are_not_published():
-    script = Path(__file__).resolve().with_name("ticket_report.py")
+    script = APPLICATION_SCRIPT
 
     for debug in (False, True):
         with TemporaryDirectory() as directory:

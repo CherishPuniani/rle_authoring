@@ -34,7 +34,10 @@ controls = [
 
 for name, broken, unsafe in controls:
     with TemporaryDirectory(prefix=f"{name}-") as directory:
-        workspace = Path(directory)
+        temporary_root = Path(directory)
+        workspace = temporary_root / "workspace"
+        workspace.mkdir()
+        # workspace = Path(directory)
 
         for filename in ("grade.py", "test_ticket_report.py", "observe_public.py"):
             shutil.copy2(project / filename, workspace / filename)
@@ -75,7 +78,7 @@ for name, broken, unsafe in controls:
         assert generation.returncode == 0, generation.stderr
 
         process = subprocess.run(
-            [sys.executable, "grade.py"],
+            [sys.executable, "grade.py", "--workspace", str(workspace), "--output", str(temporary_root / "grading-output")],
             cwd=workspace,
             capture_output=True,
             text=True,
@@ -85,7 +88,7 @@ for name, broken, unsafe in controls:
             f"{name}: grader crashed\n{process.stderr}"
         )
 
-        output = workspace / "grading-output"
+        output = temporary_root / "grading-output"
         result = json.loads((output / "result.json").read_text())
         reward = (output / "reward.txt").read_text()
 

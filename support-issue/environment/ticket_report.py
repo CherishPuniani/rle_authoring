@@ -5,22 +5,13 @@ from pathlib import Path
 
 
 def summarize(events):
-    latest = {}
+    counts = {"open": 0, "closed": 0, "pending": 0}
 
     for event in events:
-        ticket_id = event["ticket_id"]
-        if (
-            ticket_id not in latest
-            or event["revision"] >= latest[ticket_id]["revision"]
-        ):
-            latest[ticket_id] = event
-
-    counts = {"open": 0, "closed": 0, "pending": 0}
-    for event in latest.values():
         counts[event["status"]] += 1
 
     return {
-        "ticket_count": len(latest),
+        "ticket_count": len(events),
         "by_status": counts,
     }
 

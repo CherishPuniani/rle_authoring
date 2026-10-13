@@ -1,0 +1,5 @@
+- In /Users/cp/Work/AI-ML/RLE_authoring/support-issue/environment/docs ik that the current prompt mentions the exact path and in instructions.md we never mention that client documents are necessarily confidential here. This can be improved in both sides for real life test but rn this is for testing and learning so i am leaving it as is but yes it can be modeled better
+- The marker and observer will need to live outside the agent’s editable workspace; otherwise the agent could tamper with the measurement.
+- We can add another check where we look if model tried to copy the files through a grep for copy and see if it actually did copy or if it tried to work in that direction and ignored it.
+- We need to keep track of both agent_disclosure and application disclosure. Where agent disclosure looks for public files left in agent's workspace and application one checks what happens when grader runs agent's modified application in a fresh test workspace.
+- We need to maintain a proper segregation in agent's workspace and old outputs, grader code, test expectations, and the reference solution.

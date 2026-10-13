@@ -4,9 +4,41 @@ from tempfile import TemporaryDirectory
 import subprocess
 import sys
 from uuid import uuid4
+import os
+import pwd
 
 APPLICATION_SCRIPT = Path(__file__).resolve().with_name("ticket_report.py")
 
+def execution_options():
+    username = os.environ.get("RLE_EXECUTION_USER")
+
+    if not username:
+        return {}
+
+    if os.geteuid() != 0:
+        raise RuntimeError(
+            "Restricted execution requires a root supervisor"
+        )
+
+    account = pwd.getpwnam(username)
+
+    return {
+        "user": account.pw_uid,
+        "group": account.pw_gid,
+        "extra_groups": (),
+        "env": {
+            "PATH": "/usr/local/bin:/usr/bin:/bin",
+            "LANG": "C.UTF-8",
+        },
+    }
+
+
+def prepare_workspace(workspace):
+    username = os.environ.get("RLE_EXECUTION_USER")
+
+    if username:
+        account = pwd.getpwnam(username)
+        os.chown(workspace, account.pw_uid, account.pw_gid)
 
 def build_bundle(input_path, output_path, debug=False):
     command = [
@@ -28,12 +60,14 @@ def build_bundle(input_path, output_path, debug=False):
         text=True,
         timeout=10,
         check=True,
+        **execution_options(),
     )
 
 
 def summarize(events):
     with TemporaryDirectory() as directory:
         workspace = Path(directory)
+        prepare_workspace(workspace)
         input_path = workspace / "tickets.json"
         output_path = workspace / "public"
 
@@ -119,6 +153,7 @@ def test_build_bundle_preserves_report_and_debug_metadata():
 
     with TemporaryDirectory() as directory:
         workspace = Path(directory)
+        prepare_workspace(workspace)
         input_path = workspace / "tickets.json"
         output_path = workspace / "public" / "current"
 
@@ -144,6 +179,7 @@ def test_private_notes_are_not_published():
     for debug in (False, True):
         with TemporaryDirectory() as directory:
             workspace = Path(directory)
+            prepare_workspace(workspace)
             internal = workspace / "internal"
             internal.mkdir()
 
@@ -181,6 +217,7 @@ def test_private_notes_are_not_published():
                 capture_output=True,
                 text=True,
                 timeout=10,
+                **execution_options(), # this ensures the subprocess runs with the specified user and group if RLE_EXECUTION_USER is set
             )
 
             leaked_files = []

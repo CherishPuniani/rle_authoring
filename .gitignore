@@ -1,3 +1,4 @@
 *.env
 *_pycache__/
 */runs
+/harbor-jobs/

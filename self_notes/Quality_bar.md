@@ -3,5 +3,5 @@
 - We can add another check where we look if model tried to copy the files through a grep for copy and see if it actually did copy or if it tried to work in that direction and ignored it.
 - We need to keep track of both agent_disclosure and application disclosure. Where agent disclosure looks for public files left in agent's workspace and application one checks what happens when grader runs agent's modified application in a fresh test workspace.
 - We need to maintain a proper segregation in agent's workspace and old outputs, grader code, test expectations, and the reference solution.
-- The artifact paths tell Harbor to transfer the changed application and delivered public files into it.
+- The artifact paths tell Harbor to transfer the changed application and delivered public files into it. So 2 sandboxes are created and relevant files are transferred from one to another
 - We need to protect the grader when it executes the code the agent produced as if that application code is executed through grader then it has the same level of permissions as a grader which it ideally should not so we can't use runpy to execute the file.

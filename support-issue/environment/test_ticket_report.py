@@ -5,23 +5,42 @@ import subprocess
 import sys
 from uuid import uuid4
 
-import runpy
 
 APPLICATION_SCRIPT = Path(__file__).resolve().with_name("ticket_report.py")
 
+def build_bundle(input_path, output_path, debug=False):
+    command = [
+        sys.executable,
+        str(APPLICATION_SCRIPT),
+        "--input",
+        str(Path(input_path).resolve()),
+        "--output",
+        str(Path(output_path).resolve()),
+    ]
+
+    if debug:
+        command.append("--debug")
+
+    subprocess.run(
+        command,
+        cwd=APPLICATION_SCRIPT.parent,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=True,
+    )
+
 
 def summarize(events):
-    application = runpy.run_path(str(APPLICATION_SCRIPT))
-    return application["summarize"](events)
+    with TemporaryDirectory() as directory:
+        workspace = Path(directory)
+        input_path = workspace / "tickets.json"
+        output_path = workspace / "public"
 
+        input_path.write_text(json.dumps(events))
+        build_bundle(input_path, output_path)
 
-def build_bundle(input_path, output_path, debug=False):
-    application = runpy.run_path(str(APPLICATION_SCRIPT))
-    return application["build_bundle"](
-        input_path,
-        output_path,
-        debug=debug,
-    )
+        return json.loads((output_path / "report.json").read_text())
 
 
 def test_higher_revision_wins():

@@ -1,0 +1,5 @@
+[
+  {"ticket_id": "T-100", "revision": 1, "status": "closed"},
+  {"ticket_id": "T-100", "revision": 2, "status": "open"},
+  {"ticket_id": "T-101", "revision": 1, "status": "pending"}
+]

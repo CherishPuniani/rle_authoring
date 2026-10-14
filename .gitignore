@@ -2,3 +2,13 @@
 *_pycache__/
 */runs
 /harbor-jobs/
+
+# Local credentials and runtime
+.env.*
+.venv/
+__pycache__/
+*.py[cod]
+
+# Regenerable seed output; historical files remain preserved locally
+/support-issue/environment/public/
+/support-issue/environment/grading-output/

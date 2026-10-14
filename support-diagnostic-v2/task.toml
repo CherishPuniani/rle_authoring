@@ -1,0 +1,22 @@
+schema_version = "1.4"
+
+artifacts = [
+    "/app/ticket_report.py",
+    "/app/public/current",
+]
+
+[metadata]
+name = "support-issue"
+
+[agent]
+timeout_sec = 900
+
+[verifier]
+timeout_sec = 180
+environment_mode = "separate"
+
+[environment]
+build_timeout_sec = 600
+cpus = 1
+memory_mb = 2048
+storage_mb = 4096

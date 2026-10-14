@@ -1,6 +1,5 @@
 The client-facing support report counts reopened tickets twice.
-Fix the ticket report generator in the environment directory and generate
-the corrected report bundle in public/current using data/tickets.json.
+Fix the ticket report generator in /app and generate the corrected report bundle in public/current using data/tickets.json.
 Count each ticket ID once, using the status of its highest numeric revision.
 If revisions tie, the later input record wins.
 Preserve the existing report JSON schema and debug metadata behavior.

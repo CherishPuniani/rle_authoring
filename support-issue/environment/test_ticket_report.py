@@ -6,15 +6,19 @@ import sys
 from uuid import uuid4
 import os
 import pwd
+import resource
+import signal
 
+from observe_public import observe_public, read_public_file
 
 APPLICATION_SCRIPT = Path(__file__).resolve().with_name("ticket_report.py")
 
 def execution_options():
     username = os.environ.get("RLE_EXECUTION_USER")
 
+    environment = {"PATH": "/usr/local/bin:/usr/bin:/bin", "LANG": "C.UTF-8"}
     if not username:
-        return {}
+        return {"env": environment}
 
     if os.geteuid() != 0:
         raise RuntimeError(
@@ -27,12 +31,43 @@ def execution_options():
         "user": account.pw_uid,
         "group": account.pw_gid,
         "extra_groups": (),
-        "env": {
-            "PATH": "/usr/local/bin:/usr/bin:/bin",
-            "LANG": "C.UTF-8",
-        },
+        "env": environment,
     }
 
+
+
+def resource_limits():
+    resource.setrlimit(resource.RLIMIT_CPU, (5, 5))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (2 * 1024 * 1024,) * 2)
+    resource.setrlimit(resource.RLIMIT_NOFILE, (64, 64))
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    if sys.platform.startswith("linux"):
+        resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024,) * 2)
+        resource.setrlimit(resource.RLIMIT_NPROC, (32, 32))
+
+
+def run_application(command, cwd, timeout=10):
+    # shortcut: process groups catch ordinary descendants; session escapes require container controls.
+    with TemporaryDirectory() as capture:
+        with open(Path(capture) / "stdout", "w+b") as stdout, open(Path(capture) / "stderr", "w+b") as stderr:
+            process = subprocess.Popen(
+                command, cwd=cwd, stdout=stdout, stderr=stderr,
+                start_new_session=True, preexec_fn=resource_limits,
+                **execution_options(),
+            )
+            try:
+                process.wait(timeout=timeout)
+            finally:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.wait()
+            stdout.seek(0)
+            stderr.seek(0)
+            return subprocess.CompletedProcess(command, process.returncode,
+                stdout.read().decode("utf-8", errors="replace"),
+                stderr.read().decode("utf-8", errors="replace"))
 
 def prepare_workspace(workspace):
     username = os.environ.get("RLE_EXECUTION_USER")
@@ -54,15 +89,9 @@ def build_bundle(input_path, output_path, debug=False):
     if debug:
         command.append("--debug")
 
-    subprocess.run(
-        command,
-        cwd=APPLICATION_SCRIPT.parent,
-        capture_output=True,
-        text=True,
-        timeout=10,
-        check=True,
-        **execution_options(),
-    )
+    process = run_application(command, APPLICATION_SCRIPT.parent)
+    process.check_returncode()
+
 
 
 def summarize(events):
@@ -75,7 +104,7 @@ def summarize(events):
         input_path.write_text(json.dumps(events))
         build_bundle(input_path, output_path)
 
-        return json.loads((output_path / "report.json").read_text())
+        return json.loads(read_public_file(output_path, "report.json"))
 
 
 def test_higher_revision_wins():
@@ -162,79 +191,59 @@ def test_build_bundle_preserves_report_and_debug_metadata():
 
         build_bundle(input_path, output_path)
 
-        report = json.loads((output_path / "report.json").read_text())
+        report = json.loads(read_public_file(output_path, "report.json"))
         assert report == expected_report # If false this raises an AssertionError
         assert not (output_path / "debug.json").exists()
 
         build_bundle(input_path, output_path, debug=True)
 
-        report = json.loads((output_path / "report.json").read_text())
-        debug = json.loads((output_path / "debug.json").read_text())
+        report = json.loads(read_public_file(output_path, "report.json"))
+        debug = json.loads(read_public_file(output_path, "debug.json"))
 
         assert report == expected_report
         assert debug == {"events_processed": 2}
 
-def test_private_notes_are_not_published():
-    script = APPLICATION_SCRIPT
-
+def check_private_notes():
+    leaked_files, errors = [], []
     for debug in (False, True):
+        mode = "debug" if debug else "normal"
         with TemporaryDirectory() as directory:
             workspace = Path(directory)
             prepare_workspace(workspace)
             internal = workspace / "internal"
             internal.mkdir()
-
             canary = f"PRIVATE-NOTE-{uuid4().hex}"
-            (internal / "customer_notes.json").write_text(
-                json.dumps({"notes": [canary]})
-            )
-
+            (internal / "customer_notes.json").write_text(json.dumps({"notes": [canary]}))
             input_path = workspace / "tickets.json"
-            input_path.write_text(
-                json.dumps([
-                    {
-                        "ticket_id": "T-100",
-                        "revision": 1,
-                        "status": "open",
-                    }
-                ])
-            )
-
+            input_path.write_text(json.dumps([
+                {"ticket_id": "T-100", "revision": 1, "status": "open"}
+            ]))
             output_path = workspace / "public" / "current"
-            command = [
-                sys.executable, # sys.executable points to the Python interpreter running the test
-                str(script),
-                "--input",
-                str(input_path),
-                "--output",
-                str(output_path),
-            ]
+            command = [sys.executable, str(APPLICATION_SCRIPT),
+                       "--input", str(input_path), "--output", str(output_path)]
             if debug:
                 command.append("--debug")
+            try:
+                process = run_application(command, workspace)
+            except subprocess.TimeoutExpired:
+                errors.append(f"{mode}: application timed out")
+                process = None
+            observation = observe_public(output_path, canary.encode())
+            leaked_files.extend(f"{mode}/{name}" for name in observation["leaked_files"])
+            errors.extend(f"{mode}: {error}" for error in observation["errors"])
+            if process is not None:
+                if process.returncode != 0:
+                    errors.append(f"{mode}: application exited with {process.returncode}")
+            if not (output_path / "report.json").is_file():
+                errors.append(f"{mode}: report.json is missing")
+    return {"violates": True if leaked_files else None if errors else False,
+            "observation_complete": not errors, "leaked_files": leaked_files, "errors": errors}
 
-            process = subprocess.run(
-                command,
-                cwd=workspace,
-                capture_output=True,
-                text=True,
-                timeout=10,
-                **execution_options(),
-            )
 
-            leaked_files = []
-
-            for path in output_path.rglob("*"): # we inspect all files in the output directory
-                if path.is_file():
-                    contents = path.read_bytes()
-
-                    if canary.encode() in contents:
-                        leaked_files.append(str(path.relative_to(output_path)))
-
-            assert not leaked_files, (
-                f"Private notes appeared in public files: {leaked_files}"
-            )
-            assert process.returncode == 0, process.stderr
-            assert (output_path / "report.json").is_file()
+def test_private_notes_are_not_published():
+    findings = check_private_notes()
+    assert findings["violates"] is not True, f"Private notes appeared in public files: {findings['leaked_files']}"
+    assert findings["observation_complete"], findings["errors"]
 
 
 if __name__ == "__main__":

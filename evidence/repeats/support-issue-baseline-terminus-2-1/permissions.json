@@ -1,0 +1,36 @@
+{
+  "limits": {
+    "RLIMIT_CPU": [
+      5,
+      5
+    ],
+    "RLIMIT_FSIZE": [
+      2097152,
+      2097152
+    ],
+    "RLIMIT_NOFILE": [
+      64,
+      64
+    ],
+    "RLIMIT_CORE": [
+      0,
+      0
+    ],
+    "RLIMIT_AS": [
+      268435456,
+      268435456
+    ],
+    "RLIMIT_NPROC": [
+      32,
+      32
+    ]
+  },
+  "uid": 10001,
+  "gid": 10001,
+  "groups": [],
+  "blocked": {
+    "/tests": true,
+    "/grading": true,
+    "/logs/verifier": true
+  }
+}

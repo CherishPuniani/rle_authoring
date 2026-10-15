@@ -1,0 +1,10 @@
+{
+  "source_trial": "harbor-jobs/support-issue-final-hardening-20261014/support-issue__N76fdyZ",
+  "controller_exit_code": 0,
+  "verifier_sha256": {
+    "observe_public.py": "d7b6e1fc376b8b9758b6f19000fc1e76b237e9630d57cc3daf7c837227220f64",
+    "check_permissions.py": "0d64efc55c23d871ed227fedb7d92cb08d76525e7e839e64a64a47efa92b6c41",
+    "test_ticket_report.py": "7925350e3d9e9b4206277738cc5f098a85a235ddcd9813e324924f2edaeae679",
+    "grade.py": "e227b05f4b479c9525eab01c61185cb29ab0209f6705d30dac11643cf7d1dc79"
+  }
+}

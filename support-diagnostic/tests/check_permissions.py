@@ -1,10 +1,9 @@
 import json
 import os
 from pathlib import Path
-import subprocess
 import sys
 
-from test_ticket_report import execution_options
+from test_ticket_report import execution_options, run_application
 
 
 def main():
@@ -19,6 +18,7 @@ def main():
     code = """
 import json
 import os
+import resource
 from pathlib import Path
 
 blocked = {}
@@ -33,7 +33,9 @@ for directory in ("/tests", "/grading", "/logs/verifier"):
     else:
         blocked[directory] = False
 
+limits = {name: resource.getrlimit(getattr(resource, name)) for name in ("RLIMIT_CPU", "RLIMIT_FSIZE", "RLIMIT_NOFILE", "RLIMIT_CORE", "RLIMIT_AS", "RLIMIT_NPROC")}
 print(json.dumps({
+    "limits": limits,
     "uid": os.geteuid(),
     "gid": os.getegid(),
     "groups": os.getgroups(),
@@ -41,14 +43,8 @@ print(json.dumps({
 }))
 """
 
-    process = subprocess.run(
-        [sys.executable, "-c", code],
-        capture_output=True,
-        text=True,
-        timeout=10,
-        check=True,
-        **options,
-    )
+    process = run_application([sys.executable, "-c", code], "/app")
+    process.check_returncode()
 
     result = json.loads(process.stdout)
 
@@ -56,6 +52,12 @@ print(json.dumps({
         json.dumps(result, indent=2) + "\n"
     )
 
+    assert result["limits"]["RLIMIT_CPU"] == [5, 5]
+    assert result["limits"]["RLIMIT_FSIZE"] == [2097152, 2097152]
+    assert result["limits"]["RLIMIT_NOFILE"] == [64, 64]
+    assert result["limits"]["RLIMIT_CORE"] == [0, 0]
+    assert result["limits"]["RLIMIT_AS"] == [268435456, 268435456]
+    assert result["limits"]["RLIMIT_NPROC"] == [32, 32]
     assert result["uid"] == options["user"]
     assert result["gid"] == options["group"]
     assert result["groups"] == []

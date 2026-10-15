@@ -1,0 +1,8 @@
+{
+  "ticket_count": 2,
+  "by_status": {
+    "open": 1,
+    "closed": 0,
+    "pending": 1
+  }
+}
